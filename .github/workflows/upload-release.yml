@@ -18,19 +18,30 @@ jobs:
       - name: Find APK files
         id: find_apk
         run: |
-          echo "APK_PATH=$(find . -name '*.apk' | head -n 1)" >> $GITHUB_ENV
-          echo "Detected APK path: $APK_PATH"
+          APK_PATH=$(find . -type f -name '*.apk' | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "❌ Tidak ditemukan file .apk di repo."
+            exit 1
+          fi
+          echo "APK_PATH=$APK_PATH" >> $GITHUB_ENV
+          echo "✅ Ditemukan file APK di: $APK_PATH"
 
       - name: Extract version and app name
         id: extract_info
         run: |
-          FILE_NAME=$(basename $APK_PATH)
-          APP_NAME=$(echo $FILE_NAME | cut -d'_' -f1)
-          VERSION=$(echo $FILE_NAME | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')
+          FILE_NAME=$(basename "$APK_PATH")
+          echo "📦 File name: $FILE_NAME"
+
+          # Ambil nama aplikasi (bagian sebelum _v atau _release)
+          APP_NAME=$(echo "$FILE_NAME" | sed -E 's/_v[0-9]+\.[0-9]+\.[0-9]+.*//; s/_release.*//')
+
+          # Ambil versi (kalau tidak ada, fallback ke v1.0.0)
+          VERSION=$(echo "$FILE_NAME" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' || echo "v1.0.0")
+
           echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "App: $APP_NAME"
-          echo "Version: $VERSION"
+          echo "✅ App: $APP_NAME"
+          echo "✅ Version: $VERSION"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -40,3 +51,9 @@ jobs:
           files: ${{ env.APK_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "🎉 Release berhasil dibuat!"
+          echo "🔖 Tag: ${{ env.APP_NAME }}-${{ env.VERSION }}"
+          echo "📁 File: ${{ env.APK_PATH }}"
